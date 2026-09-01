@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Bank Statement to Excel Summary | IncomeAIHub by M.Dev</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+<style>
+/* ============ CONFIG ============
+   Fill these before going live. Leave SUPABASE_URL / ANON_KEY blank to run in DEMO_MODE
+   (full export unlocked locally, no real payment / backend calls).
+==================================== */
+:root{
+  --bg:#0b0c10;
+  --bg-elev:#14161c;
+  --bg-elev-2:#1b1e26;
+  --gold:#d4af6a;
+  --gold-soft:#e8cf9c;
+  --emerald:#2fae7a;
+  --violet:#8b7bd8;
+  --text:#f2efe9;
+  --text-dim:#a7a9b4;
+  --border:#2a2d38;
+  --danger:#e0685f;
+  --radius:14px;
+  --radius-sm:8px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:
+    radial-gradient(circle at 15% 0%, rgba(139,123,216,0.10), transparent 45%),
+    radial-gradient(circle at 90% 10%, rgba(47,174,122,0.10), transparent 40%),
+    var(--bg);
+  color:var(--text);
+  font-family:'DM Sans', sans-serif;
+  min-height:100vh;
+  line-height:1.5;
+}
+h1,h2,h3,.brand{font-family:'Syne', sans-serif;}
+.mono{font-family:'DM Mono', monospace;}
+a{color:var(--gold-soft);}
+::selection{background:var(--gold); color:#111;}
+
+/* ---------- Layout shell ---------- */
+.wrap{max-width:1180px; margin:0 auto; padding:0 20px 80px;}
+header.topbar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:18px 20px; border-bottom:1px solid var(--border);
+  position:sticky; top:0; z-index:40;
+  background:rgba(11,12,16,0.85); backdrop-filter:blur(10px);
+}
+.brand{display:flex; align-items:center; gap:10px; font-weight:800; font-size:1.05rem; letter-spacing:0.02em;}
+.brand .mark{
+  width:34px; height:34px; border-radius:9px;
+  background:linear-gradient(135deg, var(--gold), var(--emerald));
+  display:flex; align-items:center; justify-content:center;
+  font-size:1rem; color:#0b0c10; font-weight:800;
+}
+.brand small{display:block; font-family:'DM Sans'; font-weight:500; font-size:0.68rem; color:var(--text-dim); letter-spacing:0.03em;}
+.top-actions{display:flex; gap:10px; align-items:center;}
+.btn-ghost{
+  background:transparent; border:1px solid var(--border); color:var(--text-dim);
+  padding:9px 14px; border-radius:999px; font-size:0.82rem; cursor:pointer; font-family:'DM Sans';
+  transition:.2s;
+}
+.btn-ghost:hover{border-color:var(--gold); color:var(--gold-soft);}
+
+/* ---------- Hero ---------- */
+.hero{padding:56px 0 30px; text-align:left;}
+.eyebrow{
+  display:inline-flex; align-items:center; gap:8px;
+  font-family:'DM Mono'; font-size:0.72rem; letter-spacing:0.08em; text-transform:uppercase;
+  color:var(--emerald); border:1px solid rgba(47,174,122,0.35); background:rgba(47,174,122,0.08);
+  padding:5px 12px; border-radius:999px; margin-bottom:18px;
+}
+.hero h1{
+  font-size:clamp(1.9rem, 4vw, 3rem); font-weight:800; margin:0 0 14px; max-width:820px; line-height:1.12;
+}
+.hero h1 span{color:var(--gold-soft);}
+.hero p{color:var(--text-dim); max-width:620px; font-size:1.02rem; margin:0 0 8px;}
+
+/* ---------- Card ---------- */
+.card{
+  background:var(--bg-elev); border:1px solid var(--border); border-radius:var(--radius);
+  padding:26px; margin-bottom:24px;
+}
+.card h2{margin:0 0 4px; font-size:1.25rem;}
+.card .sub{color:var(--text-dim); font-size:0.88rem; margin:0 0 20px;}
+
+/* ---------- Dropzone ---------- */
+.dropzone{
+  border:1.5px dashed var(--border); border-radius:var(--radius);
+  padding:44px 20px; text-align:center; cursor:pointer; transition:.2s;
+  background:var(--bg-elev-2);
+}
+.dropzone.drag{border-color:var(--gold); background:rgba(212,175,106,0.06);}
+.dropzone .icon{
+  width:56px; height:56px; margin:0 auto 14px; border-radius:14px;
+  background:linear-gradient(135deg, rgba(212,175,106,0.18), rgba(139,123,216,0.18));
+  display:flex; align-items:center; justify-content:center; font-size:1.5rem;
+}
+.dropzone strong{display:block; margin-bottom:4px;}
+.dropzone span{color:var(--text-dim); font-size:0.85rem;}
+input[type=file]{display:none;}
+.file-chip{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  background:var(--bg-elev-2); border:1px solid var(--border); border-radius:var(--radius-sm);
+  padding:12px 16px; margin-top:16px; font-size:0.9rem;
+}
+.file-chip button{background:none; border:none; color:var(--danger); cursor:pointer; font-size:0.85rem; font-family:'DM Sans';}
+
+.btn-primary{
+  background:linear-gradient(135deg, var(--gold), var(--gold-soft)); color:#141414; border:none;
+  font-weight:700; padding:13px 22px; border-radius:999px; cursor:pointer; font-size:0.92rem;
+  font-family:'DM Sans'; transition:.2s; display:inline-flex; align-items:center; gap:8px;
+}
+.btn-primary:hover{transform:translateY(-1px); box-shadow:0 8px 22px rgba(212,175,106,0.25);}
+.btn-primary:disabled{opacity:0.45; cursor:not-allowed; transform:none; box-shadow:none;}
+.btn-secondary{
+  background:rgba(139,123,216,0.12); color:var(--violet); border:1px solid rgba(139,123,216,0.4);
+  font-weight:600; padding:12px 20px; border-radius:999px; cursor:pointer; font-size:0.88rem; font-family:'DM Sans';
+}
+
+/* ---------- Progress ---------- */
+.progress-wrap{display:none; margin-top:18px;}
+.progress-wrap.show{display:block;}
+.progress-track{height:8px; border-radius:999px; background:var(--bg-elev-2); overflow:hidden; border:1px solid var(--border);}
+.progress-fill{height:100%; width:0%; background:linear-gradient(90deg, var(--emerald), var(--gold)); transition:width .3s;}
+.progress-label{font-size:0.8rem; color:var(--text-dim); margin-top:8px; font-family:'DM Mono';}
+
+/* ---------- Summary grid ---------- */
+.stat-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px;}
+.stat{
+  background:var(--bg-elev); border:1px solid var(--border); border-radius:var(--radius);
+  padding:18px; position:relative; overflow:hidden;
+}
+.stat .accent{position:absolute; top:0; left:0; width:100%; height:3px;}
+.stat.credit .accent{background:var(--emerald);}
+.stat.debit .accent{background:var(--danger);}
+.stat.net .accent{background:var(--gold);}
+.stat.count .accent{background:var(--violet);}
+.stat label{display:block; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-dim); margin-bottom:8px;}
+.stat .value{font-family:'DM Mono'; font-size:1.4rem; font-weight:500;}
+.stat.credit .value{color:var(--emerald);}
+.stat.debit .value{color:var(--danger);}
+.stat.net .value{color:var(--gold-soft);}
+
+/* ---------- Two column: chart + categories ---------- */
+.split{display:grid; grid-template-columns:1.1fr 1fr; gap:20px;}
+@media(max-width:820px){.split{grid-template-columns:1fr;} .stat-grid{grid-template-columns:repeat(2,1fr);}}
+
+.cat-row{display:flex; align-items:center; gap:12px; margin-bottom:12px;}
+.cat-row .dot{width:10px; height:10px; border-radius:50%; flex-shrink:0;}
+.cat-row .name{flex:1; font-size:0.86rem;}
+.cat-row .amt{font-family:'DM Mono'; font-size:0.85rem; color:var(--text-dim);}
+.cat-bar-track{height:6px; background:var(--bg-elev-2); border-radius:999px; overflow:hidden; margin-top:4px;}
+.cat-bar-fill{height:100%; border-radius:999px;}
+
+/* ---------- Table ---------- */
+.table-scroll{overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius-sm);}
+table{width:100%; border-collapse:collapse; font-size:0.85rem; min-width:640px;}
+thead th{
+  text-align:left; padding:12px 14px; background:var(--bg-elev-2); color:var(--text-dim);
+  font-weight:600; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.05em;
+  border-bottom:1px solid var(--border); position:sticky; top:0;
+}
+tbody td{padding:10px 14px; border-bottom:1px solid var(--border); vertical-align:top;}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr:hover{background:rgba(255,255,255,0.02);}
+.tag{
+  display:inline-block; padding:2px 9px; border-radius:999px; font-size:0.7rem; font-weight:600;
+  background:rgba(139,123,216,0.14); color:var(--violet);
+}
+.amt-credit{color:var(--emerald); font-family:'DM Mono';}
+.amt-debit{color:var(--danger); font-family:'DM Mono';}
+.blurred{filter:blur(4px); user-select:none; pointer-events:none;}
+
+.locked-banner{
+  margin-top:14px; padding:16px 18px; border-radius:var(--radius-sm);
+  background:linear-gradient(135deg, rgba(212,175,106,0.10), rgba(139,123,216,0.10));
+  border:1px solid rgba(212,175,106,0.3);
+  display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;
+}
+.locked-banner .msg strong{display:block; margin-bottom:2px;}
+.locked-banner .msg span{color:var(--text-dim); font-size:0.85rem;}
+
+/* ---------- Footer / ad slots ---------- */
+.ad-slot{
+  border:1px dashed var(--border); border-radius:var(--radius-sm); padding:14px;
+  text-align:center; color:var(--text-dim); font-size:0.72rem; letter-spacing:0.04em;
+  margin:26px 0; font-family:'DM Mono';
+}
+footer{border-top:1px solid var(--border); padding:30px 20px; text-align:center; color:var(--text-dim); font-size:0.8rem;}
+footer a{color:var(--text-dim);}
+
+/* ---------- Guide modal ---------- */
+.modal-overlay{
+  position:fixed; inset:0; background:rgba(6,7,10,0.72); backdrop-filter:blur(4px);
+  display:none; align-items:center; justify-content:center; z-index:100; padding:20px;
+}
+.modal-overlay.show{display:flex;}
+.modal{
+  background:var(--bg-elev); border:1px solid var(--border); border-radius:var(--radius);
+  max-width:560px; width:100%; max-height:82vh; overflow-y:auto; padding:28px;
+  position:relative;
+}
+.modal h2{margin-top:0;}
+.modal .close{position:absolute; top:18px; right:18px; background:none; border:none; color:var(--text-dim); font-size:1.3rem; cursor:pointer;}
+.modal ol{padding-left:20px; color:var(--text-dim); font-size:0.92rem;}
+.modal ol li{margin-bottom:10px;}
+.modal ol li strong{color:var(--text);}
+
+/* ---------- toast ---------- */
+#toast{
+  position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px);
+  background:var(--bg-elev-2); border:1px solid var(--border); padding:12px 20px; border-radius:999px;
+  font-size:0.85rem; opacity:0; pointer-events:none; transition:.25s; z-index:200;
+  box-shadow:0 10px 30px rgba(0,0,0,0.4);
+}
+#toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+.demo-badge{
+  display:inline-flex; align-items:center; gap:6px; font-family:'DM Mono'; font-size:0.68rem;
+  background:rgba(224,104,95,0.12); color:var(--danger); border:1px solid rgba(224,104,95,0.35);
+  padding:4px 10px; border-radius:999px; margin-left:8px;
+}
+@media(max-width:600px){
+  .stat-grid{grid-template-columns:1fr 1fr;}
+  .card{padding:18px;}
+  header.topbar{padding:14px;}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="mark">₹⇄</div>
+    <div>
+      IncomeAIHub <span style="color:var(--text-dim); font-weight:500;">by M.Dev</span>
+      <small>PDF Bank Statement → Excel Summary</small>
+    </div>
+  </div>
+  <div class="top-actions">
+    <span id="demoBadge" class="demo-badge" style="display:none;">⚠ DEMO MODE</span>
+    <button class="btn-ghost" onclick="openGuide()">हिंदी गाइड</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section class="hero">
+    <span class="eyebrow">🏦 Bank Statement Automation</span>
+    <h1>Apna PDF bank statement daaliye, <span>seconds mein Excel summary</span> paayein</h1>
+    <p>Koi manual data entry nahi. Transactions apne aap categorize honge — salary, shopping, bills, transfer — aur ek clean formatted Excel file ban ke ready hogi, jo aap client ya apne accountant ko bhej sakte hain.</p>
+  </section>
+
+  <!-- Upload card -->
+  <div class="card" id="uploadCard">
+    <h2>1. Statement upload karein</h2>
+    <p class="sub">PDF bank statement (password-protected nahi) — kisi bhi Indian bank ka format supported hai.</p>
+
+    <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+      <div class="icon">📄</div>
+      <strong>Click ya drag-and-drop karein</strong>
+      <span>Sirf .pdf files &nbsp;•&nbsp; Max 15MB &nbsp;•&nbsp; 100% browser mein process hota hai</span>
+    </div>
+    <input type="file" id="fileInput" accept="application/pdf">
+    <div id="fileChipWrap"></div>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-label" id="progressLabel">Reading PDF...</div>
+    </div>
+
+    <div style="margin-top:20px; display:flex; gap:12px; flex-wrap:wrap;">
+      <button class="btn-primary" id="analyzeBtn" disabled onclick="analyzeStatement()">⚡ Analyze Statement</button>
+      <button class="btn-secondary" onclick="loadSampleData()">Sample data try karein</button>
+    </div>
+  </div>
+
+  <div class="ad-slot">AD SLOT — 728x90 (AdSense placeholder)</div>
+
+  <!-- Results -->
+  <div id="resultsSection" style="display:none;">
+
+    <div class="stat-grid">
+      <div class="stat credit"><div class="accent"></div><label>Total Credit</label><div class="value" id="statCredit">₹0</div></div>
+      <div class="stat debit"><div class="accent"></div><label>Total Debit</label><div class="value" id="statDebit">₹0</div></div>
+      <div class="stat net"><div class="accent"></div><label>Net Balance</label><div class="value" id="statNet">₹0</div></div>
+      <div class="stat count"><div class="accent"></div><label>Transactions</label><div class="value" id="statCount">0</div></div>
+    </div>
+
+    <div class="split">
+      <div class="card">
+        <h2>Category-wise Breakdown</h2>
+        <p class="sub">Keyword-based auto categorization</p>
+        <canvas id="catChart" width="420" height="260" style="width:100%; max-width:420px; display:block; margin:0 auto 18px;"></canvas>
+      </div>
+      <div class="card">
+        <h2>Kahan kitna gaya</h2>
+        <p class="sub">Debit categories, sabse zyada se kam</p>
+        <div id="catList"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Transactions</h2>
+      <p class="sub" id="txSub">Extracted transactions, statement order mein</p>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>Date</th><th>Description</th><th>Category</th><th>Debit</th><th>Credit</th><th>Balance</th></tr>
+          </thead>
+          <tbody id="txTableBody"></tbody>
+        </table>
+      </div>
+
+      <div class="locked-banner" id="lockedBanner" style="display:none;">
+        <div class="msg">
+          <strong>🔒 Full statement locked hai</strong>
+          <span id="lockedMsg">Preview mein sirf 10 transactions dikh rahe hain — pura data aur Excel export ke liye unlock karein.</span>
+        </div>
+        <button class="btn-primary" onclick="startUnlock()">🔓 Unlock Full Access — <span id="priceLabel">₹49</span></button>
+      </div>
+
+      <div style="margin-top:20px; display:flex; gap:12px; flex-wrap:wrap;">
+        <button class="btn-primary" onclick="exportExcel()">⬇ Download Excel (.xlsx)</button>
+        <button class="btn-secondary" onclick="resetTool()">🔄 Naya statement try karein</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="ad-slot">AD SLOT — 336x280 (AdSense placeholder)</div>
+
+</div>
+
+<footer>
+  IncomeAIHub by M.Dev — Raipur, Chhattisgarh · Freelancers, CA firms &amp; MSMEs ke liye AI tools<br>
+  Aapka data browser mein hi process hota hai, kisi server par upload nahi hota (statement parsing).
+</footer>
+
+<!-- Guide modal -->
+<div class="modal-overlay" id="guideOverlay">
+  <div class="modal">
+    <button class="close" onclick="closeGuide()">✕</button>
+    <h2>📘 इस्तेमाल कैसे करें</h2>
+    <ol>
+      <li><strong>Upload:</strong> Apne bank ka PDF statement (savings/current account) select karein ya drag-drop karein.</li>
+      <li><strong>Analyze:</strong> "Analyze Statement" par click karein — tool PDF ko browser mein hi padhta hai, kahin bhejta nahi.</li>
+      <li><strong>Summary check karein:</strong> Total credit, debit, net balance aur category-wise kharcha (Salary, Shopping, Food, Bills, ATM, Transfer, Others) turant dikhega.</li>
+      <li><strong>Preview:</strong> Pehle 10 transactions free mein dikhte hain, taaki quality check kar sakein.</li>
+      <li><strong>Unlock:</strong> Pura statement aur Excel download ke liye ek baar ka lifetime unlock payment karein (Razorpay se, UPI/card sab chalega).</li>
+      <li><strong>Download:</strong> "Download Excel" dabate hi ek .xlsx file milegi jisme 2 sheets hongi — Transactions aur Summary. Client ko seedha bhej sakte hain.</li>
+      <li><strong>Tip:</strong> Scanned/image-based PDF statements (jinme text select nahi hota) is tool mein accurately nahi parse honge — sirf digital/text-based PDF statements par best result milta hai.</li>
+    </ol>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ================= CONFIG ================= */
+const CONFIG = {
+  SUPABASE_URL: "",           // e.g. "https://xxxx.supabase.co"
+  SUPABASE_ANON_KEY: "",      // fill in production
+  RAZORPAY_KEY_ID: "",        // fill in production
+  PRICE_INR: 49,
+  TOOL_ID: "pdf-bank-statement-to-excel",
+  FREE_PREVIEW_ROWS: 10
+};
+const DEMO_MODE = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
+if(DEMO_MODE) document.getElementById('demoBadge').style.display='inline-flex';
+document.getElementById('priceLabel').textContent = '₹' + CONFIG.PRICE_INR;
+
+/* ---------- device id ---------- */
+function getDeviceId(){
+  let id = localStorage.getItem('iah_device_id');
+  if(!id){
+    id = 'dev_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem('iah_device_id', id);
+  }
+  return id;
+}
+function isUnlocked(){
+  return localStorage.getItem('iah_unlocked_' + CONFIG.TOOL_ID) === 'true';
+}
+function setUnlocked(){
+  localStorage.setItem('iah_unlocked_' + CONFIG.TOOL_ID, 'true');
+}
+
+/* ---------- toast ---------- */
+let toastTimer;
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+
+/* ---------- guide modal ---------- */
+function openGuide(){ document.getElementById('guideOverlay').classList.add('show'); }
+function closeGuide(){ document.getElementById('guideOverlay').classList.remove('show'); }
+document.getElementById('guideOverlay').addEventListener('click', e=>{
+  if(e.target.id==='guideOverlay') closeGuide();
+});
+
+/* ================= FILE HANDLING ================= */
+let selectedFile = null;
+let parsedTransactions = [];
+
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+
+['dragenter','dragover'].forEach(ev=>{
+  dropzone.addEventListener(ev, e=>{ e.preventDefault(); dropzone.classList.add('drag'); });
+});
+['dragleave','drop'].forEach(ev=>{
+  dropzone.addEventListener(ev, e=>{ e.preventDefault(); dropzone.classList.remove('drag'); });
+});
+dropzone.addEventListener('drop', e=>{
+  const f = e.dataTransfer.files[0];
+  if(f) handleFile(f);
+});
+fileInput.addEventListener('change', e=>{
+  const f = e.target.files[0];
+  if(f) handleFile(f);
+});
+
+function handleFile(f){
+  if(f.type !== 'application/pdf'){
+    toast('Sirf PDF file allowed hai');
+    return;
+  }
+  if(f.size > 15*1024*1024){
+    toast('File 15MB se badi hai');
+    return;
+  }
+  selectedFile = f;
+  document.getElementById('fileChipWrap').innerHTML = `
+    <div class="file-chip">
+      <span>📎 ${f.name} <span style="color:var(--text-dim); font-family:'DM Mono'; font-size:0.78rem;">(${(f.size/1024).toFixed(0)} KB)</span></span>
+      <button onclick="clearFile()">Remove</button>
+    </div>`;
+  document.getElementById('analyzeBtn').disabled = false;
+}
+function clearFile(){
+  selectedFile = null;
+  fileInput.value = '';
+  document.getElementById('fileChipWrap').innerHTML = '';
+  document.getElementById('analyzeBtn').disabled = true;
+}
+
+/* ================= PDF PARSING ================= */
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+async function extractPdfText(file){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+  let fullText = '';
+  for(let i=1; i<=pdf.numPages; i++){
+    updateProgress(10 + (i/pdf.numPages)*50, `Reading page ${i} of ${pdf.numPages}...`);
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    // group by approximate line (y position) to preserve row structure
+    const items = content.items;
+    let lines = {};
+    items.forEach(it=>{
+      const y = Math.round(it.transform[5]);
+      if(!lines[y]) lines[y] = [];
+      lines[y].push(it.str);
+    });
+    const sortedY = Object.keys(lines).map(Number).sort((a,b)=>b-a);
+    sortedY.forEach(y=>{ fullText += lines[y].join(' ') + '\n'; });
+    fullText += '\n';
+  }
+  return fullText;
+}
+
+function updateProgress(pct, label){
+  document.getElementById('progressWrap').classList.add('show');
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = label;
+}
+
+/* ---------- transaction line parsing ---------- */
+// Heuristic regex covering common Indian bank statement row shapes:
+// DATE  DESCRIPTION  [REF]  DEBIT  CREDIT  BALANCE   (amounts with commas/decimals)
+const DATE_RE = /(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4})/;
+const AMOUNT_RE = /-?\d{1,3}(?:,\d{2,3})*(?:\.\d{1,2})?/g;
+
+function parseTransactionsFromText(text){
+  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+  const txns = [];
+  for(const line of lines){
+    const dateMatch = line.match(DATE_RE);
+    if(!dateMatch) continue;
+    // must contain at least one numeric amount besides the date
+    const withoutDate = line.replace(dateMatch[0], '');
+    const amounts = withoutDate.match(AMOUNT_RE);
+    if(!amounts || amounts.length < 1) continue;
+    // filter out amounts that are actually part of reference numbers by requiring at least one decimal-looking or comma-grouped number OR line has 2+ numbers
+    const numericAmounts = amounts
+      .map(a=>a.replace(/,/g,''))
+      .filter(a=>a.length>0 && !isNaN(parseFloat(a)))
+      .map(a=>parseFloat(a));
+    if(numericAmounts.length === 0) continue;
+
+    // description = text between date and first amount token
+    let desc = withoutDate;
+    amounts.forEach(a=>{ desc = desc.replace(a, '|'); });
+    desc = desc.split('|')[0].trim();
+    if(!desc) desc = withoutDate.trim().slice(0,40);
+    desc = desc.replace(/\s{2,}/g,' ').slice(0,80);
+
+    // heuristic: last number = balance, and among remaining, classify debit vs credit
+    let balance = null, debit = 0, credit = 0;
+    if(numericAmounts.length >= 3){
+      balance = numericAmounts[numericAmounts.length-1];
+      debit = numericAmounts[numericAmounts.length-3] || 0;
+      credit = numericAmounts[numericAmounts.length-2] || 0;
+      // if the "debit" slot looks like zero and credit slot is the real figure, keep as is
+    } else if(numericAmounts.length === 2){
+      balance = numericAmounts[1];
+      // decide debit/credit by keyword in description
+      const amt = numericAmounts[0];
+      if(/cr|credit|deposit|salary|refund|received/i.test(desc)) credit = amt;
+      else debit = amt;
+    } else if(numericAmounts.length === 1){
+      const amt = numericAmounts[0];
+      if(/cr|credit|deposit|salary|refund|received/i.test(desc)) credit = amt;
+      else debit = amt;
+    }
+
+    txns.push({
+      date: dateMatch[0],
+      description: desc || '—',
+      debit: debit || 0,
+      credit: credit || 0,
+      balance: balance
+    });
+  }
+  return txns;
+}
+
+/* ---------- categorization ---------- */
+const CATEGORY_RULES = [
+  { name: 'Salary', color: '#2fae7a', keywords: ['salary','sal cr','payroll','wages'] },
+  { name: 'Transfer', color: '#8b7bd8', keywords: ['neft','imps','rtgs','upi','transfer','p2p','sent to','recd from'] },
+  { name: 'Shopping', color: '#d4af6a', keywords: ['amazon','flipkart','myntra','shop','mall','retail','purchase'] },
+  { name: 'Food', color: '#e0685f', keywords: ['zomato','swiggy','restaurant','food','cafe','hotel','dine'] },
+  { name: 'Bills & Utilities', color: '#5aa9e6', keywords: ['electricity','bill','recharge','dth','broadband','mobile','gas','water bill'] },
+  { name: 'ATM / Cash', color: '#c9a5f0', keywords: ['atm','cash wdl','cash withdrawal'] },
+  { name: 'EMI / Loan', color: '#f0a25a', keywords: ['emi','loan','installment'] },
+  { name: 'Investment', color: '#68d1c9', keywords: ['mutual fund','sip','stock','zerodha','groww','investment'] },
+  { name: 'Others', color: '#7a7d8a', keywords: [] }
+];
+function categorize(desc){
+  const d = desc.toLowerCase();
+  for(const cat of CATEGORY_RULES){
+    if(cat.keywords.some(k=>d.includes(k))) return cat.name;
+  }
+  return 'Others';
+}
+
+/* ================= ANALYZE FLOW ================= */
+async function analyzeStatement(){
+  if(!selectedFile) return;
+  document.getElementById('analyzeBtn').disabled = true;
+  updateProgress(5, 'Opening PDF...');
+  try{
+    const text = await extractPdfText(selectedFile);
+    updateProgress(65, 'Detecting transactions...');
+    await sleep(200);
+    let txns = parseTransactionsFromText(text);
+
+    if(txns.length === 0){
+      toast('Transactions detect nahi hue. Sample data try karein ya doosra statement upload karein.');
+      document.getElementById('progressWrap').classList.remove('show');
+      document.getElementById('analyzeBtn').disabled = false;
+      return;
+    }
+
+    txns.forEach(t=> t.category = categorize(t.description));
+    updateProgress(90, 'Building summary...');
+    await sleep(200);
+
+    parsedTransactions = txns;
+    renderResults(txns);
+    updateProgress(100, 'Done!');
+    await sleep(300);
+    document.getElementById('progressWrap').classList.remove('show');
+    document.getElementById('analyzeBtn').disabled = false;
+    toast(`${txns.length} transactions mil gaye ✅`);
+  }catch(err){
+    console.error(err);
+    toast('PDF read karne mein dikkat aayi. Kya ye scanned/image PDF hai?');
+    document.getElementById('progressWrap').classList.remove('show');
+    document.getElementById('analyzeBtn').disabled = false;
+  }
+}
+
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+function loadSampleData(){
+  const sample = [
+    {date:'01/07/2026', description:'SALARY CREDIT ACME PVT LTD', debit:0, credit:52000, balance:64500},
+    {date:'02/07/2026', description:'UPI-SWIGGY-order payment', debit:420, credit:0, balance:64080},
+    {date:'03/07/2026', description:'ATM CASH WDL RAIPUR', debit:5000, credit:0, balance:59080},
+    {date:'05/07/2026', description:'NEFT TRANSFER TO RAMESH KUMAR', debit:8000, credit:0, balance:51080},
+    {date:'06/07/2026', description:'AMAZON PURCHASE ONLINE', debit:2350, credit:0, balance:48730},
+    {date:'08/07/2026', description:'ELECTRICITY BILL PAYMENT CSPDCL', debit:1800, credit:0, balance:46930},
+    {date:'10/07/2026', description:'UPI RECD FROM CLIENT INVOICE 221', debit:0, credit:18000, balance:64930},
+    {date:'12/07/2026', description:'ZOMATO ORDER PAYMENT', debit:560, credit:0, balance:64370},
+    {date:'15/07/2026', description:'SIP MUTUAL FUND GROWW', debit:5000, credit:0, balance:59370},
+    {date:'18/07/2026', description:'MOBILE RECHARGE JIO', debit:399, credit:0, balance:58971},
+    {date:'20/07/2026', description:'EMI HOME LOAN HDFC', debit:14500, credit:0, balance:44471},
+    {date:'22/07/2026', description:'UPI TRANSFER FROM FRIEND', debit:0, credit:2500, balance:46971},
+    {date:'25/07/2026', description:'FLIPKART SHOPPING', debit:1899, credit:0, balance:45072},
+    {date:'27/07/2026', description:'ATM CASH WITHDRAWAL', debit:3000, credit:0, balance:42072},
+    {date:'29/07/2026', description:'RESTAURANT DINE OUT PAYMENT', debit:950, credit:0, balance:41122}
+  ];
+  sample.forEach(t=> t.category = categorize(t.description));
+  parsedTransactions = sample;
+  renderResults(sample);
+  toast('Sample data load ho gaya');
+}
+
+/* ================= RENDER RESULTS ================= */
+function fmt(n){
+  if(n===null || n===undefined || isNaN(n)) return '—';
+  return '₹' + Number(n).toLocaleString('en-IN', {maximumFractionDigits:2});
+}
+
+function renderResults(txns){
+  document.getElementById('resultsSection').style.display = 'block';
+
+  const totalCredit = txns.reduce((s,t)=>s + (t.credit||0), 0);
+  const totalDebit = txns.reduce((s,t)=>s + (t.debit||0), 0);
+  const net = totalCredit - totalDebit;
+
+  document.getElementById('statCredit').textContent = fmt(totalCredit);
+  document.getElementById('statDebit').textContent = fmt(totalDebit);
+  document.getElementById('statNet').textContent = (net>=0?'+':'') + fmt(net);
+  document.getElementById('statCount').textContent = txns.length;
+
+  // category totals (based on debit spend, since that's "kharcha")
+  const catTotals = {};
+  txns.forEach(t=>{
+    if(t.debit>0){
+      catTotals[t.category] = (catTotals[t.category]||0) + t.debit;
+    }
+  });
+  renderCategoryList(catTotals);
+  drawCatChart(catTotals);
+  renderTable(txns);
+}
+
+function renderCategoryList(catTotals){
+  const wrap = document.getElementById('catList');
+  const total = Object.values(catTotals).reduce((a,b)=>a+b,0) || 1;
+  const entries = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
+  if(entries.length===0){
+    wrap.innerHTML = '<p style="color:var(--text-dim); font-size:0.85rem;">Koi debit transaction nahi mila.</p>';
+    return;
+  }
+  wrap.innerHTML = entries.map(([name, amt])=>{
+    const cat = CATEGORY_RULES.find(c=>c.name===name) || CATEGORY_RULES[CATEGORY_RULES.length-1];
+    const pct = (amt/total*100).toFixed(1);
+    return `
+      <div class="cat-row-wrap">
+        <div class="cat-row">
+          <span class="dot" style="background:${cat.color}"></span>
+          <span class="name">${name}</span>
+          <span class="amt">${fmt(amt)} · ${pct}%</span>
+        </div>
+        <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${pct}%; background:${cat.color}"></div></div>
+      </div>`;
+  }).join('');
+}
+
+function drawCatChart(catTotals){
+  const canvas = document.getElementById('catChart');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width, canvas.height);
+  const entries = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
+  const total = entries.reduce((s,[,v])=>s+v,0);
+  const cx = 130, cy = 130, rOuter = 105, rInner = 62;
+
+  if(total === 0){
+    ctx.fillStyle = '#a7a9b4';
+    ctx.font = '13px DM Sans';
+    ctx.textAlign = 'center';
+    ctx.fillText('Koi debit data nahi', cx, cy);
+    return;
+  }
+
+  let startAngle = -Math.PI/2;
+  entries.forEach(([name, amt])=>{
+    const cat = CATEGORY_RULES.find(c=>c.name===name) || CATEGORY_RULES[CATEGORY_RULES.length-1];
+    const slice = (amt/total) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.arc(cx, cy, rOuter, startAngle, startAngle+slice);
+    ctx.closePath();
+    ctx.fillStyle = cat.color;
+    ctx.fill();
+    startAngle += slice;
+  });
+  // donut hole
+  ctx.beginPath();
+  ctx.arc(cx, cy, rInner, 0, Math.PI*2);
+  ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--bg-elev') || '#14161c';
+  ctx.fill();
+
+  ctx.fillStyle = '#f2efe9';
+  ctx.font = '700 15px Syne';
+  ctx.textAlign = 'center';
+  ctx.fillText(fmt(total), cx, cy-2);
+  ctx.font = '400 10px DM Sans';
+  ctx.fillStyle = '#a7a9b4';
+  ctx.fillText('Total Spend', cx, cy+16);
+
+  // legend
+  let legendY = 232;
+  ctx.font = '10px DM Mono';
+  ctx.textAlign = 'left';
+  let lx = 10;
+  entries.slice(0,4).forEach(([name],i)=>{
+    const cat = CATEGORY_RULES.find(c=>c.name===name) || CATEGORY_RULES[CATEGORY_RULES.length-1];
+    ctx.fillStyle = cat.color;
+    ctx.fillRect(lx, legendY-8, 8, 8);
+    ctx.fillStyle = '#a7a9b4';
+    ctx.fillText(name, lx+12, legendY);
+    lx += ctx.measureText(name).width + 40;
+  });
+}
+
+function renderTable(txns){
+  const unlocked = DEMO_MODE || isUnlocked();
+  const visibleCount = unlocked ? txns.length : Math.min(CONFIG.FREE_PREVIEW_ROWS, txns.length);
+  const body = document.getElementById('txTableBody');
+
+  document.getElementById('txSub').textContent = unlocked
+    ? `Total ${txns.length} transactions — full access unlocked ✅`
+    : `Preview: pehle ${visibleCount} of ${txns.length} transactions dikh rahe hain`;
+
+  body.innerHTML = txns.slice(0, unlocked ? txns.length : visibleCount).map(rowHtml).join('');
+
+  const lockedBanner = document.getElementById('lockedBanner');
+  if(!unlocked && txns.length > visibleCount){
+    lockedBanner.style.display = 'flex';
+    document.getElementById('lockedMsg').textContent =
+      `Preview mein sirf ${visibleCount} transactions dikh rahe hain — baaki ${txns.length - visibleCount} transactions aur Excel export ke liye unlock karein.`;
+  } else {
+    lockedBanner.style.display = 'none';
+  }
+}
+
+function rowHtml(t){
+  return `<tr>
+    <td class="mono">${t.date}</td>
+    <td>${t.description}</td>
+    <td><span class="tag">${t.category}</span></td>
+    <td class="amt-debit">${t.debit? fmt(t.debit): '—'}</td>
+    <td class="amt-credit">${t.credit? fmt(t.credit): '—'}</td>
+    <td class="mono">${t.balance!==null && t.balance!==undefined? fmt(t.balance): '—'}</td>
+  </tr>`;
+}
+
+function resetTool(){
+  clearFile();
+  parsedTransactions = [];
+  document.getElementById('resultsSection').style.display = 'none';
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+/* ================= EXCEL EXPORT ================= */
+function exportExcel(){
+  if(parsedTransactions.length === 0){ toast('Pehle statement analyze karein'); return; }
+  const unlocked = DEMO_MODE || isUnlocked();
+  const rows = unlocked ? parsedTransactions : parsedTransactions.slice(0, CONFIG.FREE_PREVIEW_ROWS);
+
+  if(!unlocked){
+    toast('Preview export ho raha hai — full data ke liye unlock karein');
+  }
+
+  const txSheetData = rows.map(t=>({
+    Date: t.date,
+    Description: t.description,
+    Category: t.category,
+    Debit: t.debit || '',
+    Credit: t.credit || '',
+    Balance: t.balance!==null? t.balance : ''
+  }));
+
+  const totalCredit = parsedTransactions.reduce((s,t)=>s+(t.credit||0),0);
+  const totalDebit = parsedTransactions.reduce((s,t)=>s+(t.debit||0),0);
+  const catTotals = {};
+  parsedTransactions.forEach(t=>{ if(t.debit>0) catTotals[t.category]=(catTotals[t.category]||0)+t.debit; });
+
+  const summarySheetData = [
+    {Metric:'Total Credit', Value: totalCredit},
+    {Metric:'Total Debit', Value: totalDebit},
+    {Metric:'Net Balance', Value: totalCredit-totalDebit},
+    {Metric:'Total Transactions', Value: parsedTransactions.length},
+    {Metric:'', Value:''},
+    {Metric:'Category', Value:'Amount'},
+    ...Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).map(([k,v])=>({Metric:k, Value:v}))
+  ];
+
+  const wb = XLSX.utils.book_new();
+  const ws1 = XLSX.utils.json_to_sheet(txSheetData);
+  const ws2 = XLSX.utils.json_to_sheet(summarySheetData);
+  XLSX.utils.book_append_sheet(wb, ws1, 'Transactions');
+  XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
+  XLSX.writeFile(wb, 'Bank_Statement_Summary_IncomeAIHub.xlsx');
+  toast('Excel file download ho gayi ✅');
+}
+
+/* ================= PAYWALL / UNLOCK FLOW ================= */
+/* Backend expectations (Supabase Edge Functions, same 4-function shared architecture):
+   POST {SUPABASE_URL}/functions/v1/create-order   { tool_id, device_id, amount }
+   POST {SUPABASE_URL}/functions/v1/verify-payment  { razorpay_payment_id, razorpay_order_id, razorpay_signature, tool_id, device_id }
+   GET  {SUPABASE_URL}/functions/v1/check-unlock?tool_id=..&device_id=..
+   POST {SUPABASE_URL}/functions/v1/ai-proxy        (reserved — smarter categorization in future version)
+*/
+async function startUnlock(){
+  if(DEMO_MODE){
+    // simulate instant unlock in demo mode
+    setUnlocked();
+    toast('DEMO MODE: Unlock simulate ho gaya ✅');
+    renderTable(parsedTransactions);
+    return;
+  }
+
+  try{
+    const deviceId = getDeviceId();
+    const orderRes = await fetch(`${CONFIG.SUPABASE_URL}/functions/v1/create-order`, {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':'Bearer ' + CONFIG.SUPABASE_ANON_KEY,
+        'apikey': CONFIG.SUPABASE_ANON_KEY
+      },
+      body: JSON.stringify({ tool_id: CONFIG.TOOL_ID, device_id: deviceId, amount: CONFIG.PRICE_INR })
+    });
+    const order = await orderRes.json();
+    if(!order || !order.id){ throw new Error('Order create nahi hua'); }
+
+    const rzp = new Razorpay({
+      key: CONFIG.RAZORPAY_KEY_ID,
+      amount: CONFIG.PRICE_INR * 100,
+      currency: 'INR',
+      name: 'IncomeAIHub by M.Dev',
+      description: 'PDF Bank Statement to Excel — Lifetime Unlock',
+      order_id: order.id,
+      handler: async function(response){
+        try{
+          const verifyRes = await fetch(`${CONFIG.SUPABASE_URL}/functions/v1/verify-payment`, {
+            method:'POST',
+            headers:{
+              'Content-Type':'application/json',
+              'Authorization':'Bearer ' + CONFIG.SUPABASE_ANON_KEY,
+              'apikey': CONFIG.SUPABASE_ANON_KEY
+            },
+            body: JSON.stringify({
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+              tool_id: CONFIG.TOOL_ID,
+              device_id: deviceId
+            })
+          });
+          const verify = await verifyRes.json();
+          if(verify && verify.success){
+            setUnlocked();
+            toast('Payment successful — full access unlock ho gaya ✅');
+            renderTable(parsedTransactions);
+          } else {
+            toast('Payment verify nahi ho paya. Support se contact karein.');
+          }
+        }catch(err){
+          console.error(err);
+          toast('Verification mein error aayi.');
+        }
+      },
+      theme:{ color:'#d4af6a' }
+    });
+    rzp.open();
+  }catch(err){
+    console.error(err);
+    toast('Payment start nahi ho paaya. Thodi der baad try karein.');
+  }
+}
+
+/* ---------- on load: check existing unlock (non-demo) ---------- */
+async function checkExistingUnlock(){
+  if(DEMO_MODE) return;
+  try{
+    const deviceId = getDeviceId();
+    const res = await fetch(`${CONFIG.SUPABASE_URL}/functions/v1/check-unlock?tool_id=${CONFIG.TOOL_ID}&device_id=${deviceId}`, {
+      headers:{ 'Authorization':'Bearer ' + CONFIG.SUPABASE_ANON_KEY, 'apikey': CONFIG.SUPABASE_ANON_KEY }
+    });
+    const data = await res.json();
+    if(data && data.unlocked) setUnlocked();
+  }catch(err){ /* silent */ }
+}
+checkExistingUnlock();
+</script>
+</body>
+</html>
